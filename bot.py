@@ -45,6 +45,7 @@ dp = Dispatcher()
 class SteelComposition(StatesGroup):
     waiting_for_composition = State()
     waiting_for_value = State()
+    waiting_for_rating = State()
 
 # Database connection
 def get_db_connection():
@@ -369,11 +370,46 @@ async def process_cancel_search(callback_query: CallbackQuery, state: FSMContext
 @dp.callback_query(lambda c: c.data == "finish")
 async def process_finish(callback_query: CallbackQuery, state: FSMContext):
     logger.info(f"User finished session: user_id={callback_query.from_user.id}, username={callback_query.from_user.username}")
+
+    # First, send the goodbye message
     await callback_query.message.answer(
         "Спасибо за использование бота! До свидания! 👋\n\n"
         "Для нового поиска просто запустите бота командой /start.\n\n"
         "Заходите на канал создателя бота https://t.me/mxter_ru Канал про металловедение, термообработку и ИТ в металлургии."
     )
+
+    # Then, send a separate message asking for rating
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="1", callback_data="rate_1"),
+            InlineKeyboardButton(text="2", callback_data="rate_2"),
+            InlineKeyboardButton(text="3", callback_data="rate_3"),
+            InlineKeyboardButton(text="4", callback_data="rate_4"),
+            InlineKeyboardButton(text="5", callback_data="rate_5")
+        ]
+    ])
+
+    await callback_query.message.answer(
+        "Пожалуйста, оцените работу бота от 1 до 5:",
+        reply_markup=keyboard
+    )
+
+    await state.set_state(SteelComposition.waiting_for_rating)
+    await callback_query.answer()
+
+@dp.callback_query(lambda c: c.data.startswith("rate_"))
+async def process_rating(callback_query: CallbackQuery, state: FSMContext):
+    rating = int(callback_query.data.split("_")[1])
+    user_id = callback_query.from_user.id
+    username = callback_query.from_user.username
+
+    # Log the rating
+    logger.info(f"User rating: user_id={user_id}, username={username}, rating={rating}")
+
+    # Thank the user for the rating
+    await callback_query.message.answer(f"Спасибо за вашу оценку {rating}/5!")
+
+    # Clear the state
     await state.clear()
     await callback_query.answer()
 
