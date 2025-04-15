@@ -187,8 +187,8 @@ def create_composition_keyboard(composition: Dict[str, float]) -> InlineKeyboard
 
     # Add search and new search buttons at the bottom
     keyboard.append([
-        InlineKeyboardButton(text="Поиск", callback_data="search"),
-        InlineKeyboardButton(text="Сброс", callback_data="new_search")
+        InlineKeyboardButton(text="Сброс", callback_data="new_search"),
+        InlineKeyboardButton(text="Поиск", callback_data="search")
     ])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
@@ -291,12 +291,12 @@ async def process_search(callback_query: CallbackQuery, state: FSMContext):
         # Ask if user wants to find the closest steel
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="Да", callback_data="find_closest"),
-                InlineKeyboardButton(text="Нет", callback_data="cancel_search")
+                InlineKeyboardButton(text="Нет", callback_data="cancel_search"),
+                InlineKeyboardButton(text="Да", callback_data="find_closest")
             ]
         ])
         await callback_query.message.answer(
-            "Для данного состава не найдено подходящих марок стали.\n"
+            "Для данного состава в базе не найдено подходящей стали.\n"
             "Хотите найти наиболее близкую марку стали?",
             reply_markup=keyboard
         )
@@ -370,8 +370,9 @@ async def process_cancel_search(callback_query: CallbackQuery, state: FSMContext
 async def process_finish(callback_query: CallbackQuery, state: FSMContext):
     logger.info(f"User finished session: user_id={callback_query.from_user.id}, username={callback_query.from_user.username}")
     await callback_query.message.answer(
-        "Спасибо за использование бота! До свидания! 👋\n"
-        "Если вам понадобится помощь в поиске марок стали, просто запустите бота командой /start."
+        "Спасибо за использование бота! До свидания! 👋\n\n"
+        "Для нового поиска просто запустите бота командой /start.\n\n"
+        "Заходите на канал создателя бота https://t.me/mxter_ru Канал про металловедение, термообработку и ИТ в металлургии."
     )
     await state.clear()
     await callback_query.answer()
