@@ -7,7 +7,7 @@ def init_database():
     if not os.path.exists('steel_grades.xlsx'):
         print("Error: steel_grades.xlsx file not found!")
         print("Please create an Excel file with the following columns:")
-        print("steel_grade, specification, C_min, C_max, Si_min, Si_max, Mn_min, Mn_max, S_min, S_max, P_min, P_max, Cr_min, Cr_max, Ni_min, Ni_max, Cu_min, Cu_max, Mo_min, Mo_max, V_min, V_max, Nb_min, Nb_max, Ti_min, Ti_max, N_min, N_max, W_min, W_max, B_min, B_max, Zr_min, Zr_max")
+        print("steel_grade, specification, C_min, C_max, Si_min, Si_max, Mn_min, Mn_max, S_min, S_max, P_min, P_max, Cr_min, Cr_max, Ni_min, Ni_max, Cu_min, Cu_max, Mo_min, Mo_max, V_min, V_max, Nb_min, Nb_max, Ti_min, Ti_max, N_min, N_max, W_min, W_max, B_min, B_max, Co_min, Co_max, Al_min, Al_max")
         return False
 
     # Connect to the database
@@ -49,14 +49,17 @@ def init_database():
         W_max REAL,
         B_min REAL,
         B_max REAL,
-        Zr_min REAL,
-        Zr_max REAL
+        Co_min REAL,
+        Co_max REAL,
+        Al_min REAL,
+        Al_max REAL
     )
     ''')
 
     # Read the Excel file
     try:
         df = pd.read_excel('steel_grades.xlsx')
+        print('df.columns', df.columns)
 
         # Check if all required columns are present
         required_columns = [
@@ -66,11 +69,12 @@ def init_database():
             'Ni_min', 'Ni_max', 'Cu_min', 'Cu_max', 'Mo_min', 'Mo_max',
             'V_min', 'V_max', 'Nb_min', 'Nb_max', 'Ti_min', 'Ti_max',
             'N_min', 'N_max', 'W_min', 'W_max', 'B_min', 'B_max',
-            'Zr_min', 'Zr_max'
+            'Co_min', 'Co_max', 'Al_min', 'Al_max'
         ]
 
         missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
+        print('missing_columns', missing_columns)
+        if len(missing_columns) > 0:
             print(f"Error: The following columns are missing in the Excel file: {', '.join(missing_columns)}")
             return False
 
