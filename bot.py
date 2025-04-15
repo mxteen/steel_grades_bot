@@ -17,9 +17,8 @@ dp = Dispatcher()
 
 # Define states for FSM
 class SteelComposition(StatesGroup):
-    waiting_for_element = State()
+    waiting_for_composition = State()
     waiting_for_value = State()
-    waiting_for_confirmation = State()
 
 # Database connection
 def get_db_connection():
@@ -49,7 +48,7 @@ def find_matching_steels(composition: Dict[str, float]) -> List[tuple]:
         N_min <= ? AND N_max >= ? AND
         W_min <= ? AND W_max >= ? AND
         B_min <= ? AND B_max >= ? AND
-        Zr_min <= ? AND Zr_max >= ?
+        Co_min <= ? AND Co_max >= ?
     """
 
     params = []
@@ -65,6 +64,26 @@ def find_matching_steels(composition: Dict[str, float]) -> List[tuple]:
 # List of elements to ask for
 ELEMENTS = ['C', 'Si', 'Mn', 'S', 'P', 'Cr', 'Ni', 'Cu', 'Mo', 'V', 'Nb', 'Ti', 'N', 'W', 'B', 'Zr']
 
+def create_composition_keyboard(composition: Dict[str, float]) -> InlineKeyboardMarkup:
+    keyboard = []
+    # Create rows of 2 elements each
+    for i in range(0, len(ELEMENTS), 2):
+        row = []
+        for element in ELEMENTS[i:i+2]:
+            value = composition.get(element, 0.0)
+            row.append(InlineKeyboardButton(
+                text=f"{element}: {value:.3f}",
+                callback_data=f"edit_{element}"
+            ))
+        keyboard.append(row)
+
+    # Add search and new search buttons at the bottom
+    keyboard.append([
+        InlineKeyboardButton(text="Поиск", callback_data="search"),
+        InlineKeyboardButton(text="Сброс", callback_data="new_search")
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
     await message.answer(
@@ -75,119 +94,86 @@ async def cmd_start(message: Message):
 
 @dp.message(Command("find"))
 async def cmd_find(message: Message, state: FSMContext):
-    # Initialize the composition dictionary
-    await state.update_data(composition={}, current_element_index=0)
+    # Initialize the composition dictionary with zeros
+    composition = {element: 0.0 for element in ELEMENTS}
+    await state.update_data(composition=composition)
 
-    # Get the first element
-    element = ELEMENTS[0]
+    # Create the message with current values
+    message_text = "Химический состав стали (в %):\n\n"
+    message_text += "Нажмите на элемент, чтобы изменить его значение\n"
 
-    # Create confirmation buttons
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="Подтвердить", callback_data=f"confirm_{element}"),
-            InlineKeyboardButton(text="Исправить", callback_data=f"edit_{element}")
-        ]
-    ])
+    # Create keyboard with current values
+    keyboard = create_composition_keyboard(composition)
 
-    await state.set_state(SteelComposition.waiting_for_value)
-    await message.answer(f"Введите содержание {element}:", reply_markup=keyboard)
-
-@dp.message(SteelComposition.waiting_for_value)
-async def process_element_value(message: Message, state: FSMContext):
-    try:
-        # Get the current state data
-        state_data = await state.get_data()
-        current_index = state_data.get("current_element_index", 0)
-        composition = state_data.get("composition", {})
-
-        # Get the current element
-        current_element = ELEMENTS[current_index]
-
-        # Parse the value
-        value = float(message.text)
-
-        # Update the composition
-        composition[current_element] = value
-        await state.update_data(composition=composition)
-
-        # Create confirmation buttons
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(text="Подтвердить", callback_data=f"confirm_{current_element}"),
-                InlineKeyboardButton(text="Исправить", callback_data=f"edit_{current_element}")
-            ]
-        ])
-
-        await state.set_state(SteelComposition.waiting_for_confirmation)
-        await message.answer(f"Вы ввели {current_element}: {value}. Подтвердите или исправьте:", reply_markup=keyboard)
-
-    except ValueError:
-        await message.answer(f"Пожалуйста, введите числовое значение для {ELEMENTS[current_index]}.")
-
-@dp.callback_query(lambda c: c.data.startswith("confirm_"))
-async def process_confirmation(callback_query: CallbackQuery, state: FSMContext):
-    # Get the current state data
-    state_data = await state.get_data()
-    current_index = state_data.get("current_element_index", 0)
-    composition = state_data.get("composition", {})
-
-    # Move to the next element
-    current_index += 1
-
-    # Check if we've processed all elements
-    if current_index >= len(ELEMENTS):
-        # Find matching steels
-        matches = find_matching_steels(composition)
-
-        if matches:
-            response = "Найдены подходящие марки стали:\n\n"
-            for steel_grade, specification in matches:
-                response += f"Марка стали: {steel_grade}\nСпецификация: {specification}\n\n"
-        else:
-            response = "Для данного состава не найдено подходящих марок стали."
-
-        await callback_query.message.answer(response)
-        await state.clear()
-        await callback_query.answer()
-        return
-
-    # Update the state with the new index
-    await state.update_data(current_element_index=current_index)
-
-    # Get the next element
-    next_element = ELEMENTS[current_index]
-
-    # Create confirmation buttons for the next element
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="Подтвердить", callback_data=f"confirm_{next_element}"),
-            InlineKeyboardButton(text="Исправить", callback_data=f"edit_{next_element}")
-        ]
-    ])
-
-    await state.set_state(SteelComposition.waiting_for_value)
-    await callback_query.message.answer(f"Введите содержание {next_element}:", reply_markup=keyboard)
-    await callback_query.answer()
+    await state.set_state(SteelComposition.waiting_for_composition)
+    await message.answer(message_text, reply_markup=keyboard)
 
 @dp.callback_query(lambda c: c.data.startswith("edit_"))
 async def process_edit(callback_query: CallbackQuery, state: FSMContext):
-    # Get the current state data
-    state_data = await state.get_data()
-    current_index = state_data.get("current_element_index", 0)
-
-    # Get the current element
-    current_element = ELEMENTS[current_index]
-
-    # Create confirmation buttons
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="Подтвердить", callback_data=f"confirm_{current_element}"),
-            InlineKeyboardButton(text="Исправить", callback_data=f"edit_{current_element}")
-        ]
-    ])
-
+    element = callback_query.data.split("_")[1]
+    await state.update_data(current_element=element)
     await state.set_state(SteelComposition.waiting_for_value)
-    await callback_query.message.answer(f"Введите содержание {current_element}:", reply_markup=keyboard)
+    await callback_query.message.answer(f"Введите значение для {element}:")
+    await callback_query.answer()
+
+@dp.message(SteelComposition.waiting_for_value)
+async def process_value(message: Message, state: FSMContext):
+    try:
+        value = float(message.text)
+        state_data = await state.get_data()
+        composition = state_data.get("composition", {})
+        current_element = state_data.get("current_element")
+
+        if current_element:
+            composition[current_element] = value
+            await state.update_data(composition=composition)
+
+            # Create updated message
+            message_text = "Химический состав стали (в %):\n\n"
+            message_text += "Нажмите на элемент, чтобы изменить его значение\n"
+
+            # Create keyboard with updated values
+            keyboard = create_composition_keyboard(composition)
+
+            await state.set_state(SteelComposition.waiting_for_composition)
+            await message.answer(message_text, reply_markup=keyboard)
+    except ValueError:
+        await message.answer("Пожалуйста, введите корректное числовое значение.")
+
+@dp.callback_query(lambda c: c.data == "search")
+async def process_search(callback_query: CallbackQuery, state: FSMContext):
+    state_data = await state.get_data()
+    composition = state_data.get("composition", {})
+
+    # Find matching steels
+    matches = find_matching_steels(composition)
+
+    if matches:
+        response = "Найдены подходящие марки стали:\n\n"
+        for steel_grade, specification in matches:
+            response += f"Марка стали: {steel_grade}\nСпецификация: {specification}\n\n"
+    else:
+        response = "Для данного состава не найдено подходящих марок стали."
+
+    await callback_query.message.answer(response)
+    await state.clear()
+    await callback_query.answer()
+
+@dp.callback_query(lambda c: c.data == "new_search")
+async def process_new_search(callback_query: CallbackQuery, state: FSMContext):
+    # Reset composition to all zeros
+    composition = {element: 0.0 for element in ELEMENTS}
+    await state.update_data(composition=composition)
+
+    # Create the message with reset values
+    message_text = "Химический состав стали (в %):\n\n"
+    message_text += "Нажмите на элемент, чтобы изменить его значение\n"
+
+    # Create keyboard with reset values
+    keyboard = create_composition_keyboard(composition)
+
+    await state.set_state(SteelComposition.waiting_for_composition)
+    await callback_query.message.answer(message_text, reply_markup=keyboard)
     await callback_query.answer()
 
 async def main():
