@@ -30,7 +30,13 @@ def find_matching_steels(composition: Dict[str, float]) -> List[tuple]:
     cursor = conn.cursor()
 
     query = """
-    SELECT steel_grade, specification
+    SELECT steel_grade, specification,
+           C_min, C_max, Si_min, Si_max, Mn_min, Mn_max,
+           S_min, S_max, P_min, P_max, Cr_min, Cr_max,
+           Ni_min, Ni_max, Cu_min, Cu_max, Mo_min, Mo_max,
+           V_min, V_max, Nb_min, Nb_max, Ti_min, Ti_max,
+           N_min, N_max, W_min, W_max, B_min, B_max,
+           Co_min, Co_max
     FROM steel_grades
     WHERE
         C_min <= ? AND C_max >= ? AND
@@ -52,7 +58,7 @@ def find_matching_steels(composition: Dict[str, float]) -> List[tuple]:
     """
 
     params = []
-    for element in ['C', 'Si', 'Mn', 'S', 'P', 'Cr', 'Ni', 'Cu', 'Mo', 'V', 'Nb', 'Ti', 'N', 'W', 'B', 'Zr']:
+    for element in ['C', 'Si', 'Mn', 'S', 'P', 'Cr', 'Ni', 'Cu', 'Mo', 'V', 'Nb', 'Ti', 'N', 'W', 'B', 'Co']:
         value = composition.get(element, 0)
         params.extend([value, value])
 
@@ -60,6 +66,58 @@ def find_matching_steels(composition: Dict[str, float]) -> List[tuple]:
     results = cursor.fetchall()
     conn.close()
     return results
+
+# Function to find the closest steel grade using Euclidean distance
+def find_closest_steel(composition: Dict[str, float]) -> tuple:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    query = """
+    SELECT steel_grade, specification,
+           C_min, C_max, Si_min, Si_max, Mn_min, Mn_max,
+           S_min, S_max, P_min, P_max, Cr_min, Cr_max,
+           Ni_min, Ni_max, Cu_min, Cu_max, Mo_min, Mo_max,
+           V_min, V_max, Nb_min, Nb_max, Ti_min, Ti_max,
+           N_min, N_max, W_min, W_max, B_min, B_max,
+           Co_min, Co_max
+    FROM steel_grades
+    """
+
+    cursor.execute(query)
+    results = cursor.fetchall()
+    conn.close()
+
+    if not results:
+        return None
+
+    closest_steel = None
+    min_distance = float('inf')
+
+    for result in results:
+        steel_grade, specification = result[0], result[1]
+
+        # Calculate average composition from min/max ranges
+        db_composition = {}
+        for i, element in enumerate(['C', 'Si', 'Mn', 'S', 'P', 'Cr', 'Ni', 'Cu', 'Mo', 'V', 'Nb', 'Ti', 'N', 'W', 'B', 'Co']):
+            min_idx = 2 + i * 2
+            max_idx = min_idx + 1
+            min_val = result[min_idx] or 0
+            max_val = result[max_idx] or 0
+            db_composition[element] = (min_val + max_val) / 2
+
+        # Calculate Euclidean distance
+        distance = 0
+        for element in ['C', 'Si', 'Mn', 'S', 'P', 'Cr', 'Ni', 'Cu', 'Mo', 'V', 'Nb', 'Ti', 'N', 'W', 'B', 'Co']:
+            input_val = composition.get(element, 0)
+            db_val = db_composition.get(element, 0)
+            distance += (input_val - db_val) ** 2
+        distance = distance ** 0.5
+
+        if distance < min_distance:
+            min_distance = distance
+            closest_steel = (steel_grade, specification, db_composition)
+
+    return closest_steel
 
 # List of elements to ask for
 ELEMENTS = ['C', 'Si', 'Mn', 'S', 'P', 'Cr', 'Ni', 'Cu', 'Mo', 'V', 'Nb', 'Ti', 'N', 'W', 'B', 'Zr']
@@ -150,12 +208,51 @@ async def process_search(callback_query: CallbackQuery, state: FSMContext):
 
     if matches:
         response = "Найдены подходящие марки стали:\n\n"
-        for steel_grade, specification in matches:
+        for steel_grade, specification, *_ in matches:
             response += f"Марка стали: {steel_grade}\nСпецификация: {specification}\n\n"
+        await callback_query.message.answer(response)
+        await state.clear()
     else:
-        response = "Для данного состава не найдено подходящих марок стали."
+        # Ask if user wants to find the closest steel
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Да", callback_data="find_closest"),
+                InlineKeyboardButton(text="Нет", callback_data="cancel_search")
+            ]
+        ])
+        await callback_query.message.answer(
+            "Для данного состава не найдено подходящих марок стали.\n"
+            "Хотите найти наиболее близкую марку стали?",
+            reply_markup=keyboard
+        )
+    await callback_query.answer()
+
+@dp.callback_query(lambda c: c.data == "find_closest")
+async def process_find_closest(callback_query: CallbackQuery, state: FSMContext):
+    state_data = await state.get_data()
+    composition = state_data.get("composition", {})
+
+    # Find the closest steel
+    closest = find_closest_steel(composition)
+
+    if closest:
+        steel_grade, specification, db_composition = closest
+        response = "Найдена наиболее близкая марка стали:\n\n"
+        response += f"Марка стали: {steel_grade}\n"
+        response += f"Спецификация: {specification}\n\n"
+        response += "Средний состав марки стали:\n"
+        for element, value in db_composition.items():
+            response += f"{element}: {value:.3f}%\n"
+    else:
+        response = "Не удалось найти подходящую марку стали."
 
     await callback_query.message.answer(response)
+    await state.clear()
+    await callback_query.answer()
+
+@dp.callback_query(lambda c: c.data == "cancel_search")
+async def process_cancel_search(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.message.answer("Поиск отменен.")
     await state.clear()
     await callback_query.answer()
 
