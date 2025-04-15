@@ -1,5 +1,8 @@
 import os
 import sqlite3
+import logging
+import json
+from datetime import datetime
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
@@ -10,6 +13,29 @@ from aiogram.fsm.state import State, StatesGroup
 
 # Load environment variables
 load_dotenv()
+
+# Configure logging
+log_directory = "logs"
+if not os.path.exists(log_directory):
+    os.makedirs(log_directory)
+
+log_file = os.path.join(log_directory, f"steel_bot_{datetime.now().strftime('%Y%m%d')}.log")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("steel_bot")
+
+# Log startup information
+logger.info("=" * 50)
+logger.info("Steel Bot Started")
+logger.info(f"Log file: {log_file}")
+logger.info("=" * 50)
 
 # Initialize bot and dispatcher
 bot = Bot(token=os.getenv("BOT_TOKEN"))
@@ -23,6 +49,30 @@ class SteelComposition(StatesGroup):
 # Database connection
 def get_db_connection():
     return sqlite3.connect('steel_database.db')
+
+# Function to log search activity
+def log_search_activity(user_id: int, username: str, composition: Dict[str, float], results: List[tuple], is_closest: bool = False):
+    timestamp = datetime.now().isoformat()
+
+    # Convert results to a serializable format
+    serializable_results = []
+    for result in results:
+        if len(result) >= 2:
+            serializable_results.append({
+                "steel_grade": result[0],
+                "specification": result[1]
+            })
+
+    log_entry = {
+        "timestamp": timestamp,
+        "user_id": user_id,
+        "username": username,
+        "composition": composition,
+        "results": serializable_results,
+        "is_closest_match": is_closest
+    }
+
+    logger.info(f"Search activity: {json.dumps(log_entry, ensure_ascii=False)}")
 
 # Function to find matching steel grades
 def find_matching_steels(composition: Dict[str, float]) -> List[tuple]:
@@ -144,6 +194,7 @@ def create_composition_keyboard(composition: Dict[str, float]) -> InlineKeyboard
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
+    logger.info(f"User started bot: user_id={message.from_user.id}, username={message.from_user.username}")
     await message.answer(
         "Добро пожаловать в бот для поиска марок стали! 🏭\n\n"
         "Я помогу вам найти марки стали на основе их химического состава.\n"
@@ -152,6 +203,7 @@ async def cmd_start(message: Message):
 
 @dp.message(Command("find"))
 async def cmd_find(message: Message, state: FSMContext):
+    logger.info(f"User started search: user_id={message.from_user.id}, username={message.from_user.username}")
     # Initialize the composition dictionary with zeros
     composition = {element: 0.0 for element in ELEMENTS}
     await state.update_data(composition=composition)
@@ -203,6 +255,9 @@ async def process_search(callback_query: CallbackQuery, state: FSMContext):
     state_data = await state.get_data()
     composition = state_data.get("composition", {})
 
+    # Log the search attempt
+    logger.info(f"User initiated search: user_id={callback_query.from_user.id}, username={callback_query.from_user.username}, composition={composition}")
+
     # Find matching steels
     matches = find_matching_steels(composition)
 
@@ -211,7 +266,27 @@ async def process_search(callback_query: CallbackQuery, state: FSMContext):
         for steel_grade, specification, *_ in matches:
             response += f"Марка стали: {steel_grade}\nСпецификация: {specification}\n\n"
         await callback_query.message.answer(response)
-        await state.clear()
+
+        # Log the successful search with exact matches
+        log_search_activity(
+            callback_query.from_user.id,
+            callback_query.from_user.username,
+            composition,
+            matches,
+            is_closest=False
+        )
+
+        # Ask if user wants to make another search
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Новый поиск", callback_data="new_search"),
+                InlineKeyboardButton(text="Завершить", callback_data="finish")
+            ]
+        ])
+        await callback_query.message.answer(
+            "Хотите выполнить новый поиск или завершить работу?",
+            reply_markup=keyboard
+        )
     else:
         # Ask if user wants to find the closest steel
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -243,21 +318,67 @@ async def process_find_closest(callback_query: CallbackQuery, state: FSMContext)
         response += "Средний состав марки стали:\n"
         for element, value in db_composition.items():
             response += f"{element}: {value:.3f}%\n"
+
+        # Log the successful search with closest match
+        log_search_activity(
+            callback_query.from_user.id,
+            callback_query.from_user.username,
+            composition,
+            [(steel_grade, specification)],
+            is_closest=True
+        )
     else:
         response = "Не удалось найти подходящую марку стали."
+        logger.warning(f"No closest steel found for user: user_id={callback_query.from_user.id}, username={callback_query.from_user.username}")
 
     await callback_query.message.answer(response)
-    await state.clear()
+
+    # Ask if user wants to make another search
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Новый поиск", callback_data="new_search"),
+            InlineKeyboardButton(text="Завершить", callback_data="finish")
+        ]
+    ])
+    await callback_query.message.answer(
+        "Хотите выполнить новый поиск или завершить работу?",
+        reply_markup=keyboard
+    )
+
     await callback_query.answer()
 
 @dp.callback_query(lambda c: c.data == "cancel_search")
 async def process_cancel_search(callback_query: CallbackQuery, state: FSMContext):
+    logger.info(f"User cancelled search: user_id={callback_query.from_user.id}, username={callback_query.from_user.username}")
     await callback_query.message.answer("Поиск отменен.")
+
+    # Ask if user wants to make another search
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Новый поиск", callback_data="new_search"),
+            InlineKeyboardButton(text="Завершить", callback_data="finish")
+        ]
+    ])
+    await callback_query.message.answer(
+        "Хотите выполнить новый поиск или завершить работу?",
+        reply_markup=keyboard
+    )
+
+    await callback_query.answer()
+
+@dp.callback_query(lambda c: c.data == "finish")
+async def process_finish(callback_query: CallbackQuery, state: FSMContext):
+    logger.info(f"User finished session: user_id={callback_query.from_user.id}, username={callback_query.from_user.username}")
+    await callback_query.message.answer(
+        "Спасибо за использование бота! До свидания! 👋\n"
+        "Если вам понадобится помощь в поиске марок стали, просто запустите бота командой /start."
+    )
     await state.clear()
     await callback_query.answer()
 
 @dp.callback_query(lambda c: c.data == "new_search")
 async def process_new_search(callback_query: CallbackQuery, state: FSMContext):
+    logger.info(f"User started new search: user_id={callback_query.from_user.id}, username={callback_query.from_user.username}")
     # Reset composition to all zeros
     composition = {element: 0.0 for element in ELEMENTS}
     await state.update_data(composition=composition)
@@ -274,6 +395,7 @@ async def process_new_search(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.answer()
 
 async def main():
+    logger.info("Bot started")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
