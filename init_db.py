@@ -7,7 +7,7 @@ def init_database():
     if not os.path.exists('steel_grades.xlsx'):
         print("Error: steel_grades.xlsx file not found!")
         print("Please create an Excel file with the following columns:")
-        print("steel_grade, specification, C_min, C_max, Si_min, Si_max, Mn_min, Mn_max, S_min, S_max, P_min, P_max, Cr_min, Cr_max, Ni_min, Ni_max, Cu_min, Cu_max, Mo_min, Mo_max, V_min, V_max, Nb_min, Nb_max, Ti_min, Ti_max, N_min, N_max, W_min, W_max, B_min, B_max, Co_min, Co_max, Al_min, Al_max")
+        print("steel_grade, specification, C_min, C_max, Si_min, Si_max, Mn_min, Mn_max, S_min, S_max, P_min, P_max, Cr_min, Cr_max, Ni_min, Ni_max, Cu_min, Cu_max, Mo_min, Mo_max, Al_min, Al_max, Nb_min, Nb_max, V_min, V_max, Ti_min, Ti_max, N_min, N_max, W_min, W_max, B_min, B_max, Co_min, Co_max, Ce_min, Ce_max")
         return False
 
     # Connect to the database
@@ -37,10 +37,12 @@ def init_database():
         Cu_max REAL,
         Mo_min REAL,
         Mo_max REAL,
-        V_min REAL,
-        V_max REAL,
+        Al_min REAL,
+        Al_max REAL,
         Nb_min REAL,
         Nb_max REAL,
+        V_min REAL,
+        V_max REAL,
         Ti_min REAL,
         Ti_max REAL,
         N_min REAL,
@@ -51,8 +53,8 @@ def init_database():
         B_max REAL,
         Co_min REAL,
         Co_max REAL,
-        Al_min REAL,
-        Al_max REAL
+        Ce_min REAL,
+        Ce_max REAL
     )
     ''')
 
@@ -69,7 +71,7 @@ def init_database():
             'Ni_min', 'Ni_max', 'Cu_min', 'Cu_max', 'Mo_min', 'Mo_max',
             'Al_min', 'Al_max', 'Nb_min', 'Nb_max', 'V_min', 'V_max',
             'Ti_min', 'Ti_max', 'N_min', 'N_max', 'W_min', 'W_max',
-            'B_min', 'B_max', 'Co_min', 'Co_max', 'Ce_min', 'Ce_max',
+            'B_min', 'B_max', 'Co_min', 'Co_max', 'Ce_min', 'Ce_max'
         ]
 
         missing_columns = [col for col in required_columns if col not in df.columns]
