@@ -46,6 +46,7 @@ class SteelComposition(StatesGroup):
     waiting_for_composition = State()
     waiting_for_value = State()
     waiting_for_rating = State()
+    waiting_for_feedback = State()
 
 # Database connection
 def get_db_connection():
@@ -99,13 +100,15 @@ def find_matching_steels(composition: Dict[str, float]) -> List[tuple]:
         Ni_min <= ? AND Ni_max >= ? AND
         Cu_min <= ? AND Cu_max >= ? AND
         Mo_min <= ? AND Mo_max >= ? AND
-        V_min <= ? AND V_max >= ? AND
+        Al_min <= ? AND Al_max >= ? AND
         Nb_min <= ? AND Nb_max >= ? AND
+        V_min <= ? AND V_max >= ? AND
         Ti_min <= ? AND Ti_max >= ? AND
         N_min <= ? AND N_max >= ? AND
         W_min <= ? AND W_max >= ? AND
         B_min <= ? AND B_max >= ? AND
-        Co_min <= ? AND Co_max >= ?
+        Co_min <= ? AND Co_max >= ? AND
+        Ce_min <= ? AND Ce_max >= ?
     """
 
     params = []
@@ -409,9 +412,38 @@ async def process_rating(callback_query: CallbackQuery, state: FSMContext):
     # Thank the user for the rating
     await callback_query.message.answer(f"Спасибо за вашу оценку {rating}/5!")
 
+    # If rating is 3 or less, ask for feedback
+    if rating <= 3:
+        await callback_query.message.answer(
+            "Пожалуйста, расскажите, что могло быть улучшено? Ваш отзыв поможет мне сделать бота лучше."
+        )
+        await state.set_state(SteelComposition.waiting_for_feedback)
+    else:
+        # Clear the state for high ratings
+        await state.clear()
+
+    await callback_query.answer()
+
+@dp.message(SteelComposition.waiting_for_feedback)
+async def process_feedback(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    username = message.from_user.username
+    feedback = message.text
+
+    # Log the feedback
+    logger.info(f"User feedback: user_id={user_id}, username={username}, feedback={feedback}")
+
+    # Save feedback to a dedicated log file
+    feedback_log_file = os.path.join(log_directory, "user_feedback.log")
+    with open(feedback_log_file, "a", encoding="utf-8") as f:
+        timestamp = datetime.now().isoformat()
+        f.write(f"{timestamp} - User ID: {user_id}, Username: {username}, Feedback: {feedback}\n")
+
+    # Thank the user for their feedback
+    await message.answer("Спасибо за ваш отзыв! Мы учтем его при улучшении бота.")
+
     # Clear the state
     await state.clear()
-    await callback_query.answer()
 
 @dp.callback_query(lambda c: c.data == "new_search")
 async def process_new_search(callback_query: CallbackQuery, state: FSMContext):
