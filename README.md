@@ -9,6 +9,7 @@ A Telegram bot that helps metallurgists and engineers find steel grades based on
 - 📝 Easy data management through Excel
 - 🔄 Simple database updates
 - 🌐 Russian language interface
+- 📈 User activity tracking and messaging
 
 ## Setup
 
@@ -44,11 +45,8 @@ pip install -r requirements.txt
    ```
 
 5. Create the steel grade database:
-   - Run the template generator:
-   ```bash
-   python create_excel_template.py
-   ```
-   - Edit the generated `steel_grades.xlsx` file with your steel grade data
+   - Use the provided `steel_grades_template.xlsx` file as a template
+   - Edit the file with your steel grade data
    - Initialize the database:
    ```bash
    python init_db.py
