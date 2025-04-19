@@ -203,7 +203,7 @@ async def cmd_start(message: Message):
     logger.info(f"User started bot: user_id={message.from_user.id}, username={message.from_user.username}")
     await message.answer(
         "Добро пожаловать в бот для поиска марок стали! 🏭\n\n"
-        "Я помогу вам найти марки стали на основе их химического состава.\n"
+        "Я помогу вам найти марки стали на основе заданного химического состава.\n"
         "Используйте команду /find, чтобы начать поиск."
     )
 
@@ -262,7 +262,9 @@ async def process_search(callback_query: CallbackQuery, state: FSMContext):
     composition = state_data.get("composition", {})
 
     # Log the search attempt
-    logger.info(f"User initiated search: user_id={callback_query.from_user.id}, username={callback_query.from_user.username}, composition={composition}")
+    logger.info(
+        f"User initiated search: user_id={callback_query.from_user.id}, " +\
+        f"username={callback_query.from_user.username}, composition={composition}")
 
     # Find matching steels
     matches = find_matching_steels(composition)
@@ -270,7 +272,7 @@ async def process_search(callback_query: CallbackQuery, state: FSMContext):
     if matches:
         response = "Найдены подходящие марки стали:\n\n"
         for steel_grade, specification, *_ in matches:
-            response += f"Марка стали: {steel_grade}\nСпецификация: {specification}\n\n"
+            response += f"Марка стали: {steel_grade}\Стандарт: {specification}\n\n"
         await callback_query.message.answer(response)
 
         # Log the successful search with exact matches
@@ -302,8 +304,8 @@ async def process_search(callback_query: CallbackQuery, state: FSMContext):
             ]
         ])
         await callback_query.message.answer(
-            "Для данного состава в базе не найдено подходящей стали.\n"
-            "Хотите найти наиболее близкую марку стали?",
+            "Для заданного состава в базе не найдено подходящей марки стали.\n"
+            "Хотите найти наиболее близкую марку?",
             reply_markup=keyboard
         )
     await callback_query.answer()
@@ -320,10 +322,10 @@ async def process_find_closest(callback_query: CallbackQuery, state: FSMContext)
         steel_grade, specification, db_composition = closest
         response = "Найдена наиболее близкая марка стали:\n\n"
         response += f"Марка стали: {steel_grade}\n"
-        response += f"Спецификация: {specification}\n\n"
-        response += "Средний состав марки стали:\n"
-        for element, value in db_composition.items():
-            response += f"{element}: {value:.3f}%\n"
+        response += f"Стандарт: {specification}\n\n"
+        # response += "Средний состав марки стали:\n"
+        # for element, value in db_composition.items():
+        #     response += f"{element}: {value:.3f}%\n"
 
         # Log the successful search with closest match
         log_search_activity(
@@ -378,9 +380,9 @@ async def process_finish(callback_query: CallbackQuery, state: FSMContext):
 
     # First, send the goodbye message
     await callback_query.message.answer(
-        "Спасибо за использование бота! До свидания! 👋\n\n"
+        "До свидания! 👋\n\n"
         "Для нового поиска просто запустите бота командой /start.\n\n"
-        "Заходите на канал создателя бота https://t.me/mxter_ru Канал про металловедение, термообработку и ИТ в металлургии."
+        "Заходите на мой канал https://t.me/mxter_ru про металловедение, термообработку и ИТ в металлургии."
     )
 
     # Then, send a separate message asking for rating
