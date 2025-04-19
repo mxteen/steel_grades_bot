@@ -67,9 +67,9 @@ def init_database():
             'C_min', 'C_max', 'Si_min', 'Si_max', 'Mn_min', 'Mn_max',
             'S_min', 'S_max', 'P_min', 'P_max', 'Cr_min', 'Cr_max',
             'Ni_min', 'Ni_max', 'Cu_min', 'Cu_max', 'Mo_min', 'Mo_max',
-            'V_min', 'V_max', 'Nb_min', 'Nb_max', 'Ti_min', 'Ti_max',
-            'N_min', 'N_max', 'W_min', 'W_max', 'B_min', 'B_max',
-            'Co_min', 'Co_max', 'Al_min', 'Al_max'
+            'Al_min', 'Al_max', 'Nb_min', 'Nb_max', 'V_min', 'V_max',
+            'Ti_min', 'Ti_max', 'N_min', 'N_max', 'W_min', 'W_max',
+            'B_min', 'B_max', 'Co_min', 'Co_max', 'Ce_min', 'Ce_max',
         ]
 
         missing_columns = [col for col in required_columns if col not in df.columns]

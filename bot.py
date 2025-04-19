@@ -11,6 +11,10 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
+# List of elements
+ELEMENTS = ['C', 'Si', 'Mn', 'S', 'P', 'Cr', 'Ni', 'Cu', 'Mo', 'Al', 'Nb', 'V',
+           'Ti', 'N', 'W', 'B', 'Co', 'Ce']
+
 # Load environment variables
 load_dotenv()
 
@@ -86,9 +90,9 @@ def find_matching_steels(composition: Dict[str, float]) -> List[tuple]:
            C_min, C_max, Si_min, Si_max, Mn_min, Mn_max,
            S_min, S_max, P_min, P_max, Cr_min, Cr_max,
            Ni_min, Ni_max, Cu_min, Cu_max, Mo_min, Mo_max,
-           V_min, V_max, Nb_min, Nb_max, Ti_min, Ti_max,
+           Al_min, Al_max, Nb_min, Nb_max, V_min, V_max, Ti_min, Ti_max,
            N_min, N_max, W_min, W_max, B_min, B_max,
-           Co_min, Co_max
+           Co_min, Co_max, Ce_min, Ce_max
     FROM steel_grades
     WHERE
         C_min <= ? AND C_max >= ? AND
@@ -112,7 +116,7 @@ def find_matching_steels(composition: Dict[str, float]) -> List[tuple]:
     """
 
     params = []
-    for element in ['C', 'Si', 'Mn', 'S', 'P', 'Cr', 'Ni', 'Cu', 'Mo', 'V', 'Nb', 'Ti', 'N', 'W', 'B', 'Co']:
+    for element in ELEMENTS:
         value = composition.get(element, 0)
         params.extend([value, value])
 
@@ -131,9 +135,9 @@ def find_closest_steel(composition: Dict[str, float]) -> tuple:
            C_min, C_max, Si_min, Si_max, Mn_min, Mn_max,
            S_min, S_max, P_min, P_max, Cr_min, Cr_max,
            Ni_min, Ni_max, Cu_min, Cu_max, Mo_min, Mo_max,
-           V_min, V_max, Nb_min, Nb_max, Ti_min, Ti_max,
+           Al_min, Al_max, Nb_min, Nb_max, V_min, V_max, Ti_min, Ti_max,
            N_min, N_max, W_min, W_max, B_min, B_max,
-           Co_min, Co_max
+           Co_min, Co_max, Ce_min, Ce_max
     FROM steel_grades
     """
 
@@ -152,7 +156,7 @@ def find_closest_steel(composition: Dict[str, float]) -> tuple:
 
         # Calculate average composition from min/max ranges
         db_composition = {}
-        for i, element in enumerate(['C', 'Si', 'Mn', 'S', 'P', 'Cr', 'Ni', 'Cu', 'Mo', 'V', 'Nb', 'Ti', 'N', 'W', 'B', 'Co']):
+        for i, element in enumerate(ELEMENTS):
             min_idx = 2 + i * 2
             max_idx = min_idx + 1
             min_val = result[min_idx] or 0
@@ -161,7 +165,7 @@ def find_closest_steel(composition: Dict[str, float]) -> tuple:
 
         # Calculate Euclidean distance
         distance = 0
-        for element in ['C', 'Si', 'Mn', 'S', 'P', 'Cr', 'Ni', 'Cu', 'Mo', 'V', 'Nb', 'Ti', 'N', 'W', 'B', 'Co']:
+        for element in ELEMENTS:
             input_val = composition.get(element, 0)
             db_val = db_composition.get(element, 0)
             distance += (input_val - db_val) ** 2
@@ -173,8 +177,6 @@ def find_closest_steel(composition: Dict[str, float]) -> tuple:
 
     return closest_steel
 
-# List of elements to ask for
-ELEMENTS = ['C', 'Si', 'Mn', 'S', 'P', 'Cr', 'Ni', 'Cu', 'Mo', 'V', 'Nb', 'Ti', 'N', 'W', 'B', 'Zr']
 
 def create_composition_keyboard(composition: Dict[str, float]) -> InlineKeyboardMarkup:
     keyboard = []
