@@ -45,12 +45,46 @@ BOT_TOKEN=your_telegram_bot_token_here
 
 ### Docker Installation
 
-1. Build the Docker image:
-```bash
-docker build -t steel-grades-bot .
-```
+#### Building the Container
 
-2. Run the container with environment variables and volume mounts for persistent data:
+1. **Ensure Docker is installed and running:**
+   - Verify Docker installation:
+     ```bash
+     docker --version
+     ```
+   - Check if Docker daemon is running:
+     ```bash
+     docker info
+     ```
+
+2. **Build the Docker image:**
+   ```bash
+   docker build -t steel-grades-bot .
+   ```
+
+   This command will:
+   - Use Python 3.11-slim as the base image
+   - Install all dependencies from `requirements.txt`
+   - Copy the application files into the container
+   - Create the logs directory
+   - Set up the container to run `bot.py` on startup
+
+3. **Verify the image was created successfully:**
+   ```bash
+   docker images | grep steel-grades-bot
+   ```
+
+   You should see the `steel-grades-bot` image listed with its size and creation date.
+
+4. **(Optional) Test the image:**
+   ```bash
+   docker run --rm steel-grades-bot python --version
+   ```
+   This should output Python 3.11.x and confirms the image is working correctly.
+
+#### Running the Container
+
+1. Run the container with environment variables and volume mounts for persistent data:
 ```bash
 docker run -d \
   --name steel-bot \
@@ -85,6 +119,52 @@ docker run -d \
 ```
 
 The volume mounts ensure that your database and log files persist even when the container is removed or recreated.
+
+#### Managing the Container
+
+**Check container status:**
+```bash
+docker ps -a | grep steel-bot
+```
+
+**View container logs:**
+```bash
+docker logs steel-bot
+```
+
+**Follow logs in real-time:**
+```bash
+docker logs -f steel-bot
+```
+
+**Stop the container:**
+```bash
+docker stop steel-bot
+```
+
+**Start a stopped container:**
+```bash
+docker start steel-bot
+```
+
+**Restart the container:**
+```bash
+docker restart steel-bot
+```
+
+**Remove the container:**
+```bash
+docker stop steel-bot
+docker rm steel-bot
+```
+
+**Rebuild the image (after code changes):**
+```bash
+docker build -t steel-grades-bot .
+docker stop steel-bot
+docker rm steel-bot
+# Then run the container again using the commands from step 1 above
+```
 
 ## Usage
 
