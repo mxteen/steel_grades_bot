@@ -50,10 +50,41 @@ BOT_TOKEN=your_telegram_bot_token_here
 docker build -t steel-grades-bot .
 ```
 
-2. Run the container:
+2. Run the container with environment variables and volume mounts for persistent data:
 ```bash
-docker run -d --name steel-bot steel-grades-bot
+docker run -d \
+  --name steel-bot \
+  --restart unless-stopped \
+  -e BOT_TOKEN=your_telegram_bot_token_here \
+  -v $(pwd)/steel_database.db:/app/steel_database.db \
+  -v $(pwd)/logs:/app/logs \
+  steel-grades-bot
 ```
+
+**Note for Windows (PowerShell):**
+```powershell
+docker run -d `
+  --name steel-bot `
+  --restart unless-stopped `
+  -e BOT_TOKEN=your_telegram_bot_token_here `
+  -v ${PWD}/steel_database.db:/app/steel_database.db `
+  -v ${PWD}/logs:/app/logs `
+  steel-grades-bot
+```
+
+**Alternative: Using .env file**
+If you prefer to use a `.env` file, you can mount it as well:
+```bash
+docker run -d \
+  --name steel-bot \
+  --restart unless-stopped \
+  --env-file .env \
+  -v $(pwd)/steel_database.db:/app/steel_database.db \
+  -v $(pwd)/logs:/app/logs \
+  steel-grades-bot
+```
+
+The volume mounts ensure that your database and log files persist even when the container is removed or recreated.
 
 ## Usage
 
