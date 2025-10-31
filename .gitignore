@@ -1,3 +1,10 @@
+# Data
+steel_grades.xlsx
+steel_database.db
+
+# Active users
+active_users.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
